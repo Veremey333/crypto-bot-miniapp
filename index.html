@@ -25,6 +25,11 @@
   .badge{font-size:11px; font-weight:700; color:#ffb020; border:1px solid #ffb020;
     padding:2px 7px; border-radius:20px; white-space:nowrap}
   .badge.live-mode{color:var(--muted); border-color:var(--border)}
+  .tabs{display:flex; background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:3px; gap:3px; margin-bottom:12px}
+  .tabs button{flex:1; background:none; border:0; color:var(--muted); font:inherit;
+    font-size:14px; font-weight:600; padding:8px 0; border-radius:9px; cursor:pointer}
+  .tabs button.active{background:var(--card2); color:var(--text)}
   .card{background:var(--card); border:1px solid var(--border); border-radius:16px;
     padding:14px; margin-bottom:12px}
   .card h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em;
@@ -42,9 +47,9 @@
     font-size:15px; cursor:pointer; text-align:left}
   .coin:last-child{border-bottom:0}
   .coin.active{background:var(--card2); border-radius:10px}
-  .coin .sym{font-weight:700; width:64px; flex:none}
+  .coin .sym{font-weight:700; min-width:64px; flex:none}
   .coin .tag{font-size:10px; color:var(--muted); border:1px solid var(--border);
-    border-radius:8px; padding:1px 5px; margin-left:6px}
+    border-radius:8px; padding:1px 5px; margin-left:6px; white-space:nowrap}
   .coin .price{flex:1; text-align:right; font-variant-numeric:tabular-nums}
   .coin .chg{width:76px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
   .prow{display:flex; justify-content:space-between; gap:10px; padding:9px 0;
@@ -70,6 +75,24 @@
   .rules li:before{content:"•"; position:absolute; left:2px; color:var(--accent)}
   .foot{color:var(--muted); font-size:12px; text-align:center; margin-top:4px}
   .empty{color:var(--muted); font-size:13.5px}
+  .allnote{font-size:12.5px; color:var(--muted); margin-bottom:10px}
+  .search{width:100%; background:var(--card2); border:1px solid var(--border);
+    border-radius:10px; color:var(--text); padding:9px 11px; font:inherit;
+    font-size:14px; margin-bottom:8px; outline:none}
+  .search:focus{border-color:var(--accent)}
+  #allList{max-height:62vh; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-top:6px}
+  .mrow{display:flex; align-items:center; gap:6px; padding:7px 2px;
+    border-bottom:1px solid var(--border); font-size:14px}
+  .mrow:last-child{border-bottom:0}
+  .star{background:none; border:0; font-size:17px; cursor:pointer; padding:2px 3px;
+    line-height:1; color:#f5c542; flex:none}
+  .star.off{color:var(--muted); opacity:.5}
+  .star:disabled{cursor:default; opacity:1}
+  .msym{font-weight:700; min-width:54px; flex:none}
+  .mtag{font-size:10px; color:var(--muted); border:1px solid var(--border);
+    border-radius:8px; padding:1px 5px; white-space:nowrap}
+  .mprice{flex:1; text-align:right; font-variant-numeric:tabular-nums}
+  .mchg{width:72px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600; flex:none}
 </style>
 </head>
 <body>
@@ -81,6 +104,12 @@
     <span class="status" id="statusText">подключение…</span>
   </header>
 
+  <nav class="tabs">
+    <button id="tabBtnDeals" class="active" type="button">Сделки</button>
+    <button id="tabBtnAll" type="button">Все монеты</button>
+  </nav>
+
+  <div id="tabDeals">
   <section class="card">
     <h2>Баланс бумажного счёта</h2>
     <div class="equity" id="eqVal">—</div>
@@ -138,26 +167,46 @@
 
   <div class="foot" id="updatedAt">Данные счёта: —</div>
   <div class="foot">Только бумажная торговля. Без реальных денег и ключей.</div>
+  </div><!-- /tabDeals -->
+
+  <div id="tabAll" hidden>
+  <section class="card">
+    <h2>Все монеты · Kraken, спот к USD</h2>
+    <div class="allnote">Звезда добавляет монету в твой список во вкладке «Сделки» — цены и график сразу живые. Чтобы бот начал слать алерты и торговать этой монетой, скажи Джарвису в чате — он включит её в торговлю.</div>
+    <input class="search" id="allSearch" type="text" placeholder="Поиск монеты: SOL, DOGE, PEPE…" autocomplete="off">
+    <div class="eqinfo" id="allInfo">Список ещё не загружен</div>
+    <div id="allList"><div class="empty">Список подгрузится с Kraken…</div></div>
+  </section>
+  </div><!-- /tabAll -->
 </div>
 
 <script>
 "use strict";
 try { var tg = window.Telegram && window.Telegram.WebApp; if (tg) { tg.ready(); tg.expand(); } } catch (e) {}
 
+/* PAIRS — символы подписки WS v2 (для BTC это BTC/USD, не XBT/USD).
+   REST_PAIR — имена пар для REST OHLC.
+   wsnameOfSym — wsname из dashboard.json (BTC -> XBT/USD), нужен для
+   сопоставления с полным списком пар Kraken во вкладке «Все монеты». */
 var PAIRS = {BTC:"BTC/USD", SOL:"SOL/USD", XRP:"XRP/USD", LINK:"LINK/USD",
              NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD"};
 var REST_PAIR = {BTC:"XBTUSD", SOL:"SOLUSD", XRP:"XRPUSD", LINK:"LINKUSD",
                  NEAR:"NEARUSD", ADA:"ADAUSD", HMSTR:"HMSTRUSD"};
+var wsnameOfSym = {BTC:"XBT/USD", SOL:"SOL/USD", XRP:"XRP/USD", LINK:"LINK/USD",
+                   NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD"};
 var ORDER = ["BTC","SOL","XRP","LINK","NEAR","ADA","HMSTR"];
 var SYM_BY_PAIR = {}; ORDER.forEach(function(s){ SYM_BY_PAIR[PAIRS[s]] = s; });
+var tradingCoins = ["SOL","XRP","LINK","NEAR","ADA","HMSTR"]; // уточняется из dashboard.json
 
-var live = {};        // sym -> {last, chg}
-var candles = {1: {}, 15: {}, 60: {}};  // интервал -> sym -> [{t,o,h,l,c}]
+var live = {};        // sym -> {last, chg} (торговые монеты и BTC)
+var watchLive = {};   // wsname -> {last, chg} (монеты пользовательского списка)
+var candles = {1: {}, 15: {}, 60: {}};  // интервал -> ключ (sym или wsname) -> свечи
 var interval = 1;
 var TF_LABEL = {1: "1 мин", 15: "15 мин", 60: "1 час"};
-var selected = "SOL";
-var currentOhlc = null;  // {sym, iv}
+var selectedKey = "SOL";  // sym торговой монеты или wsname вида "XDG/USD"
+var currentOhlc = null;   // {key, iv}
 var account = null;
+var activeTab = "deals";
 
 function $(id){ return document.getElementById(id); }
 function fmtPrice(p){
@@ -180,57 +229,135 @@ function priceFor(sym){
   if (account && account.prices && account.prices[sym] != null) return account.prices[sym];
   return null;
 }
+function baseOf(ws){ return (ws || "").split("/")[0]; }
+function displayBase(base){ // подписи как принято у Kraken v2: XDG -> DOGE, XBT -> BTC
+  if (base === "XDG") return "DOGE";
+  if (base === "XBT") return "BTC";
+  return base;
+}
+function normWs(ws){ return ws === "XBT/USD" ? "BTC/USD" : ws; } // v2 ждёт BTC/USD
 
-/* ---------- список монет ---------- */
-var coinEls = {};
-(function buildCoins(){
-  var box = $("coinList");
-  ORDER.forEach(function(sym){
-    var b = document.createElement("button");
-    b.className = "coin" + (sym === selected ? " active" : "");
-    var name = document.createElement("span"); name.className = "sym"; name.textContent = sym;
-    b.appendChild(name);
-    if (sym === "BTC") {
-      var tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "индикатор";
-      b.appendChild(tag);
-    }
-    var pr = document.createElement("span"); pr.className = "price"; pr.textContent = "—";
-    var ch = document.createElement("span"); ch.className = "chg"; ch.textContent = "";
-    b.appendChild(pr); b.appendChild(ch);
-    b.addEventListener("click", function(){ selectCoin(sym); });
-    box.appendChild(b);
-    coinEls[sym] = {row: b, price: pr, chg: ch};
-  });
+/* ---------- пользовательский список (watchlist, localStorage) ---------- */
+var watchlist = (function(){
+  try {
+    var v = JSON.parse(localStorage.getItem("watchlist") || "[]");
+    return Array.isArray(v) ? v.filter(function(x){ return typeof x === "string"; }) : [];
+  } catch (e) { return []; }
 })();
+function saveWatch(){
+  try { localStorage.setItem("watchlist", JSON.stringify(watchlist)); } catch (e) {}
+}
+/* Монеты списка, не дублирующие встроенные пары (SOL/USD и т.п. уже есть
+   в сетке как торговые, XBT/USD — это тот же BTC). */
+function activeWatch(){
+  var taken = {};
+  ORDER.forEach(function(s){ taken[normWs(PAIRS[s])] = true; });
+  return watchlist.filter(function(ws){ return !taken[normWs(ws)]; });
+}
 
-function renderPrices(){
-  ORDER.forEach(function(sym){
-    var d = live[sym], el = coinEls[sym];
+/* ---------- сетка цен во вкладке «Сделки» ---------- */
+var coinEls = {};  // ключ (sym или wsname) -> {row, price, chg}
+function builtinTag(sym){
+  if (sym === "BTC") return "индикатор";
+  if (tradingCoins.indexOf(sym) >= 0) return "торгуется";
+  return null;
+}
+function addCoinRow(key, label, tag){
+  var b = document.createElement("button");
+  b.className = "coin" + (key === selectedKey ? " active" : "");
+  var name = document.createElement("span"); name.className = "sym"; name.textContent = label;
+  b.appendChild(name);
+  if (tag) {
+    var t = document.createElement("span"); t.className = "tag"; t.textContent = tag;
+    b.appendChild(t);
+  }
+  var pr = document.createElement("span"); pr.className = "price"; pr.textContent = "—";
+  var ch = document.createElement("span"); ch.className = "chg"; ch.textContent = "";
+  b.appendChild(pr); b.appendChild(ch);
+  b.addEventListener("click", function(){ selectCoin(key); });
+  $("coinList").appendChild(b);
+  coinEls[key] = {row: b, price: pr, chg: ch};
+}
+function rebuildCoins(){
+  var box = $("coinList"); box.textContent = "";
+  coinEls = {};
+  ORDER.forEach(function(sym){ addCoinRow(sym, sym, builtinTag(sym)); });
+  activeWatch().forEach(function(ws){ addCoinRow(ws, displayBase(baseOf(ws)), "мой список"); });
+  renderPrices();
+}
+function rowData(key){
+  if (key.indexOf("/") < 0) {  // торговая монета / BTC
+    var d = live[key];
     var p = (d && d.last != null) ? d.last
-          : (account && account.prices ? account.prices[sym] : null);
-    el.price.textContent = p != null ? fmtPrice(p) : "—";
-    if (d && d.chg != null) { el.chg.textContent = fmtPct(d.chg); el.chg.className = "chg " + cls(d.chg); }
-  });
+          : (account && account.prices ? account.prices[key] : null);
+    return {p: p, chg: d ? d.chg : null};
+  }
+  var w = watchLive[key];      // монета из списка: сначала WS, потом REST-кэш
+  if (w && w.last != null) return {p: w.last, chg: w.chg};
+  var m = marketByWs[key];
+  if (m) return {p: m.price, chg: m.chg};
+  return {p: null, chg: null};
+}
+function renderPrices(){
+  for (var key in coinEls) {
+    var el = coinEls[key], d = rowData(key);
+    el.price.textContent = d.p != null ? fmtPrice(d.p) : "—";
+    if (d.chg != null) { el.chg.textContent = fmtPct(d.chg); el.chg.className = "chg " + cls(d.chg); }
+  }
 }
 
+/* ---------- выбор монеты и график ---------- */
+function displayPairForKey(key){ return key.indexOf("/") >= 0 ? key : PAIRS[key]; }
+function wsnameForKey(key){ return key.indexOf("/") >= 0 ? normWs(key) : PAIRS[key]; }
 function updateChartTitle(){
-  $("chartTitle").textContent = "График · " + PAIRS[selected] + ", " + TF_LABEL[interval];
+  $("chartTitle").textContent = "График · " + displayPairForKey(selectedKey) + ", " + TF_LABEL[interval];
 }
-function selectCoin(sym){
-  selected = sym;
-  ORDER.forEach(function(s){ coinEls[s].row.classList.toggle("active", s === sym); });
+function selectCoin(key){
+  selectedKey = key;
+  for (var k in coinEls) coinEls[k].row.classList.toggle("active", k === key);
   updateChartTitle();
-  loadChartREST(sym);
-  subscribeOhlc(sym);
+  loadChartREST(key);
+  subscribeOhlc(key);
   drawChart();
 }
 
 /* ---------- WebSocket Kraken v2 ---------- */
 var ws = null, reconnectDelay = 1000;
+var tickerSubs = {};       // символ подписки -> true
+var subSymToWatchWs = {};  // символ подписки -> wsname из watchlist
 function setStatus(mode, text){
   var dot = $("statusDot");
   dot.className = "dot " + mode;
   $("statusText").textContent = text;
+}
+function findWatchWs(reported){
+  if (subSymToWatchWs[reported]) return subSymToWatchWs[reported];
+  for (var i = 0; i < watchlist.length; i++)
+    if (watchlist[i] === reported || normWs(watchlist[i]) === reported) return watchlist[i];
+  var b = baseOf(reported);  // алиасы v2: DOGE/USD <-> XDG/USD
+  var alt = b === "DOGE" ? "XDG" : (b === "XDG" ? "DOGE" : null);
+  if (alt) for (var j = 0; j < watchlist.length; j++)
+    if (baseOf(watchlist[j]) === alt) return watchlist[j];
+  return null;
+}
+function syncTickerSubs(){
+  if (!ws || ws.readyState !== 1) return;
+  var want = {};
+  ORDER.forEach(function(s){ want[PAIRS[s]] = true; });
+  subSymToWatchWs = {};
+  activeWatch().forEach(function(w){
+    var sub = normWs(w);
+    want[sub] = true;
+    subSymToWatchWs[sub] = w;
+  });
+  var toAdd = [], toDel = [], k;
+  for (k in want) if (!tickerSubs[k]) toAdd.push(k);
+  for (k in tickerSubs) if (!want[k]) toDel.push(k);
+  if (toAdd.length) ws.send(JSON.stringify({method: "subscribe",
+    params: {channel: "ticker", symbol: toAdd}}));
+  if (toDel.length) ws.send(JSON.stringify({method: "unsubscribe",
+    params: {channel: "ticker", symbol: toDel}}));
+  tickerSubs = want;
 }
 function connectWS(){
   setStatus("connecting", "подключение…");
@@ -239,32 +366,35 @@ function connectWS(){
   ws.onopen = function(){
     reconnectDelay = 1000;
     setStatus("live", "LIVE");
-    ws.send(JSON.stringify({method: "subscribe",
-      params: {channel: "ticker", symbol: ORDER.map(function(s){ return PAIRS[s]; })}}));
+    tickerSubs = {};
+    syncTickerSubs();
     currentOhlc = null;
-    subscribeOhlc(selected);
+    subscribeOhlc(selectedKey);
   };
   ws.onmessage = function(ev){
     var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
     if (msg.channel === "ticker" && msg.data) {
       msg.data.forEach(function(d){
-        var sym = SYM_BY_PAIR[d.symbol]; if (!sym) return;
-        live[sym] = {last: d.last, chg: d.change_pct};
+        var sym = SYM_BY_PAIR[d.symbol];
+        if (sym) { live[sym] = {last: d.last, chg: d.change_pct}; return; }
+        var w = findWatchWs(d.symbol);
+        if (w) watchLive[w] = {last: d.last, chg: d.change_pct};
       });
       renderPrices(); renderAccount();
     } else if (msg.channel === "ohlc" && msg.data) {
       msg.data.forEach(function(d){
-        var sym = SYM_BY_PAIR[d.symbol]; if (!sym) return;
+        var key = SYM_BY_PAIR[d.symbol] || findWatchWs(d.symbol);
+        if (!key) return;
         var ts = Date.parse(d.interval_begin || d.timestamp || "") / 1000;
         if (!ts) return;
         var c = {t: ts, o: +d.open, h: +d.high, l: +d.low, c: +d.close};
         var iv = d.interval || interval;
-        var bySym = candles[iv] || (candles[iv] = {});
-        var arr = bySym[sym] || (bySym[sym] = []);
+        var byKey = candles[iv] || (candles[iv] = {});
+        var arr = byKey[key] || (byKey[key] = []);
         if (arr.length && arr[arr.length - 1].t === c.t) arr[arr.length - 1] = c;
         else if (!arr.length || arr[arr.length - 1].t < c.t) arr.push(c);
         if (arr.length > 90) arr.splice(0, arr.length - 90);
-        if (sym === selected && iv === interval) drawChart();
+        if (key === selectedKey && iv === interval) drawChart();
       });
     }
   };
@@ -275,40 +405,47 @@ function scheduleReconnect(){
   setTimeout(connectWS, reconnectDelay);
   reconnectDelay = Math.min(reconnectDelay * 2, 30000);
 }
-function subscribeOhlc(sym){
+function subscribeOhlc(key){
   if (!ws || ws.readyState !== 1) return;
-  if (currentOhlc && (currentOhlc.sym !== sym || currentOhlc.iv !== interval)) {
+  if (currentOhlc && (currentOhlc.key !== key || currentOhlc.iv !== interval)) {
     ws.send(JSON.stringify({method: "unsubscribe",
-      params: {channel: "ohlc", symbol: [PAIRS[currentOhlc.sym]], interval: currentOhlc.iv}}));
+      params: {channel: "ohlc", symbol: [wsnameForKey(currentOhlc.key)], interval: currentOhlc.iv}}));
   }
-  currentOhlc = {sym: sym, iv: interval};
+  currentOhlc = {key: key, iv: interval};
   ws.send(JSON.stringify({method: "subscribe",
-    params: {channel: "ohlc", symbol: [PAIRS[sym]], interval: interval}}));
+    params: {channel: "ohlc", symbol: [wsnameForKey(key)], interval: interval}}));
 }
 
 /* ---------- график ---------- */
-function loadChartREST(sym){
+function loadChartREST(key){
   var iv = interval;
-  fetch("https://api.kraken.com/0/public/OHLC?pair=" + REST_PAIR[sym] + "&interval=" + iv)
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if (!j || (j.error && j.error.length)) return;
-      var key = Object.keys(j.result).filter(function(k){ return k !== "last"; })[0];
-      if (!key) return;
-      (candles[iv] || (candles[iv] = {}))[sym] = j.result[key].slice(-60).map(function(c){
-        return {t: +c[0], o: +c[1], h: +c[2], l: +c[3], c: +c[4]};
-      });
-      if (sym === selected && iv === interval) drawChart();
-    })
-    .catch(function(){ /* REST недоступен: график соберётся из WS-потока */ });
+  // Торговые монеты: REST-имя из таблицы. Монеты списка: пробуем wsname
+  // (Kraken принимает "XDG/USD"), при ошибке — без слэша ("XBTUSD").
+  var candidates = key.indexOf("/") >= 0 ? [key, key.replace("/", "")] : [REST_PAIR[key]];
+  (function tryNext(i){
+    if (i >= candidates.length) return;
+    fetch("https://api.kraken.com/0/public/OHLC?pair=" + candidates[i] + "&interval=" + iv)
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || (j.error && j.error.length)) { tryNext(i + 1); return; }
+        var k0 = Object.keys(j.result).filter(function(x){ return x !== "last"; })[0];
+        if (!k0) { tryNext(i + 1); return; }
+        (candles[iv] || (candles[iv] = {}))[key] = j.result[k0].slice(-60).map(function(c){
+          return {t: +c[0], o: +c[1], h: +c[2], l: +c[3], c: +c[4]};
+        });
+        if (key === selectedKey && iv === interval) drawChart();
+      })
+      .catch(function(){ tryNext(i + 1); /* REST недоступен: график соберётся из WS */ });
+  })(0);
 }
 function drawChart(){
   var cv = $("chart"), ctx = cv.getContext("2d");
   var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (!w || !h) return;
   if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  var arr = ((candles[interval] || {})[selected] || []).slice(-60);
+  var arr = ((candles[interval] || {})[selectedKey] || []).slice(-60);
   ctx.font = "12px sans-serif"; ctx.fillStyle = "#8b98a8";
   if (arr.length < 2) { ctx.fillText("Собираю данные графика…", 8, 24); return; }
   var min = Infinity, max = -Infinity;
@@ -340,8 +477,8 @@ function setTf(tf){
   for (var i = 0; i < btns.length; i++)
     btns[i].classList.toggle("active", +btns[i].getAttribute("data-tf") === tf);
   updateChartTitle();
-  loadChartREST(selected);
-  subscribeOhlc(selected);
+  loadChartREST(selectedKey);
+  subscribeOhlc(selectedKey);
   drawChart();
 }
 (function buildTf(){
@@ -359,8 +496,13 @@ function loadAccount(){
     .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(j){
       account = j;
-      renderAccount(); renderSignals(); renderRules(); renderPrices();
-      renderTrades(); renderEquity();
+      if (Array.isArray(j.trading_coins) && j.trading_coins.length)
+        tradingCoins = j.trading_coins.slice();
+      if (j.pairs) for (var s in j.pairs) if (j.pairs[s]) wsnameOfSym[s] = j.pairs[s];
+      rebuildCoins();
+      syncTickerSubs();
+      renderAccount(); renderSignals(); renderRules();
+      renderTrades(); renderEquity(); renderAllCoins();
     })
     .catch(function(){ /* нет файла рядом: оставим прежние данные */ });
 }
@@ -516,11 +658,175 @@ function renderRules(){
   });
 }
 
+/* ---------- вкладка «Все монеты»: полный список Kraken (только REST) ---------- */
+var marketByWs = {};    // wsname -> {base, price, chg, volUsd}
+var marketList = [];    // wsname, сортировка по обороту USD за 24ч, по убыванию
+var internalByWs = {};  // wsname -> внутреннее имя пары (AssetPairs)
+var wsByInternal = {};  // внутреннее имя пары -> wsname
+var marketLoaded = false, marketLoading = false;
+
+function tradingWsSet(){
+  var set = {};
+  tradingCoins.forEach(function(sym){
+    var w = wsnameOfSym[sym] || PAIRS[sym];
+    if (w) { set[w] = true; set[normWs(w)] = true; }
+  });
+  return set;
+}
+function loadMarket(withPairs){
+  if (marketLoading) return;
+  marketLoading = true;
+  var step = withPairs
+    ? fetch("https://api.kraken.com/0/public/AssetPairs")
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (!j || (j.error && j.error.length)) throw new Error("AssetPairs");
+          internalByWs = {}; wsByInternal = {};
+          var res = j.result || {};
+          for (var internal in res) {
+            var info = res[internal], w = info.wsname;
+            if (!w || w.slice(-4) !== "/USD") continue;
+            if (internal.indexOf(".d") >= 0 || w.indexOf(".d") >= 0) continue; // darkpool
+            if (info.status && info.status !== "online") continue;
+            internalByWs[w] = internal; wsByInternal[internal] = w;
+          }
+        })
+    : Promise.resolve();
+  step.then(function(){
+      return fetch("https://api.kraken.com/0/public/Ticker");
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || (j.error && j.error.length)) throw new Error("Ticker");
+      var res = j.result || {};
+      for (var internal in res) {
+        var w = wsByInternal[internal];
+        if (!w) continue;
+        var d = res[internal];
+        var c = parseFloat(d.c && d.c[0]), o = parseFloat(d.o),
+            v = parseFloat(d.v && d.v[1]);
+        if (!isFinite(c)) continue;
+        marketByWs[w] = {
+          base: baseOf(w), price: c,
+          chg: (isFinite(o) && o > 0) ? (c - o) / o * 100 : null,
+          volUsd: isFinite(v) ? v * c : 0
+        };
+      }
+      marketList = Object.keys(marketByWs).sort(function(a, b){
+        return marketByWs[b].volUsd - marketByWs[a].volUsd;
+      });
+      marketLoaded = true; marketLoading = false;
+      renderAllCoins(); renderPrices();
+    })
+    .catch(function(){
+      marketLoading = false;
+      if (!marketLoaded) {
+        $("allInfo").textContent = "Не удалось загрузить список монет Kraken — попробуйте позже";
+        var box = $("allList"); box.textContent = "";
+        var e = document.createElement("div"); e.className = "empty";
+        e.textContent = "Ошибка загрузки. Проверьте сеть и откройте вкладку ещё раз.";
+        box.appendChild(e);
+      }
+    });
+}
+function renderAllCoins(){
+  var box = $("allList");
+  if (!box) return;
+  var scroll = box.scrollTop;
+  box.textContent = "";
+  if (!marketLoaded) {
+    var e0 = document.createElement("div"); e0.className = "empty";
+    e0.textContent = marketLoading ? "Загружаю список монет…" : "Список ещё не загружен";
+    box.appendChild(e0);
+    return;
+  }
+  var q = ($("allSearch").value || "").trim().toUpperCase();
+  var tset = tradingWsSet();
+  var shown = 0;
+  var frag = document.createDocumentFragment();
+  marketList.forEach(function(w){
+    var m = marketByWs[w];
+    var disp = displayBase(m.base);
+    if (q && m.base.indexOf(q) < 0 && disp.indexOf(q) < 0 && w.toUpperCase().indexOf(q) < 0) return;
+    shown++;
+    var trading = !!tset[w];
+    var inWatch = watchlist.indexOf(w) >= 0;
+    var row = document.createElement("div"); row.className = "mrow";
+    var star = document.createElement("button");
+    star.className = "star" + ((trading || inWatch) ? "" : " off");
+    star.type = "button";
+    star.textContent = (trading || inWatch) ? "⭐" : "☆";
+    star.setAttribute("data-ws", w);
+    if (trading) { star.disabled = true; star.title = "Монета уже торгуется ботом"; }
+    row.appendChild(star);
+    var s = document.createElement("span"); s.className = "msym"; s.textContent = disp;
+    row.appendChild(s);
+    if (trading) {
+      var tag = document.createElement("span"); tag.className = "mtag";
+      tag.textContent = "торгуется"; row.appendChild(tag);
+    }
+    var pr = document.createElement("span"); pr.className = "mprice";
+    pr.textContent = fmtPrice(m.price);
+    var ch = document.createElement("span");
+    ch.className = "mchg" + (m.chg != null ? " " + cls(m.chg) : "");
+    ch.textContent = m.chg != null ? fmtPct(m.chg) : "—";
+    row.appendChild(pr); row.appendChild(ch);
+    frag.appendChild(row);
+  });
+  if (!shown) {
+    var e = document.createElement("div"); e.className = "empty";
+    e.textContent = "Ничего не нашлось по запросу «" + q + "»";
+    frag.appendChild(e);
+  }
+  box.appendChild(frag);
+  box.scrollTop = scroll;
+  $("allInfo").textContent = "Монет: " + marketList.length +
+    (q ? " · показано: " + shown : "") + " · цены Kraken, обновление каждые 30 сек";
+}
+function toggleWatch(w){
+  var i = watchlist.indexOf(w);
+  if (i >= 0) {
+    watchlist.splice(i, 1);
+    if (selectedKey === w) selectCoin("SOL");
+  } else {
+    watchlist.push(w);
+  }
+  saveWatch();
+  rebuildCoins();
+  syncTickerSubs();
+  renderAllCoins();
+}
+$("allList").addEventListener("click", function(ev){
+  var t = ev.target;
+  if (t && t.classList && t.classList.contains("star") && !t.disabled) {
+    var w = t.getAttribute("data-ws");
+    if (w) toggleWatch(w);
+  }
+});
+$("allSearch").addEventListener("input", function(){ renderAllCoins(); });
+
+/* ---------- вкладки ---------- */
+function setTab(name){
+  activeTab = name;
+  $("tabBtnDeals").classList.toggle("active", name === "deals");
+  $("tabBtnAll").classList.toggle("active", name === "all");
+  $("tabDeals").hidden = name !== "deals";
+  $("tabAll").hidden = name !== "all";
+  if (name === "all" && !marketLoaded) loadMarket(true);
+  if (name === "deals") { drawChart(); renderEquity(); }
+}
+$("tabBtnDeals").addEventListener("click", function(){ setTab("deals"); });
+$("tabBtnAll").addEventListener("click", function(){ setTab("all"); });
+
 /* ---------- старт ---------- */
+rebuildCoins();
+updateChartTitle();
 loadAccount();
 setInterval(loadAccount, 30000);
-loadChartREST(selected);
+setInterval(function(){ if (marketLoaded) loadMarket(false); }, 30000);
+loadChartREST(selectedKey);
 connectWS();
+if (watchlist.length) loadMarket(true); // REST-цены для монет списка, пока WS не подхватил
 </script>
 </body>
 </html>
