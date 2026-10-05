@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Крипто-бот · бумажный счёт</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0e1116; --card:#171c24; --card2:#1d242f; --text:#e8edf3; --muted:#8b98a8;
+    --green:#2ecc71; --red:#ff5c5c; --accent:#2ea6ff; --border:#232c38;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px; line-height:1.45}
+  .wrap{max-width:480px; margin:0 auto; padding:14px 12px 28px}
+  header{display:flex; align-items:center; gap:8px; margin:2px 2px 12px}
+  header h1{font-size:17px; margin:0; font-weight:700; flex:1}
+  .dot{width:9px; height:9px; border-radius:50%; background:#777; flex:none}
+  .dot.live{background:var(--green); box-shadow:0 0 8px var(--green)}
+  .dot.connecting{background:#f5c542}
+  .dot.off{background:var(--red)}
+  .status{font-size:12px; color:var(--muted)}
+  .badge{font-size:11px; font-weight:700; color:#ffb020; border:1px solid #ffb020;
+    padding:2px 7px; border-radius:20px; white-space:nowrap}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:14px; margin-bottom:12px}
+  .card h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); margin:0 0 10px; font-weight:600}
+  .equity{font-size:34px; font-weight:800; line-height:1.1}
+  .growth{font-size:15px; font-weight:700; margin-top:2px}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .grid{display:flex; gap:10px; margin-top:12px}
+  .cell{flex:1; background:var(--card2); border-radius:12px; padding:9px 10px}
+  .cell .k{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+  .cell .v{font-size:15px; font-weight:700; margin-top:2px}
+  .cell .s{font-size:12px; color:var(--muted)}
+  .coin{display:flex; align-items:center; width:100%; background:none; border:0;
+    border-bottom:1px solid var(--border); color:var(--text); padding:10px 4px;
+    font-size:15px; cursor:pointer; text-align:left}
+  .coin:last-child{border-bottom:0}
+  .coin.active{background:var(--card2); border-radius:10px}
+  .coin .sym{font-weight:700; width:64px; flex:none}
+  .coin .tag{font-size:10px; color:var(--muted); border:1px solid var(--border);
+    border-radius:8px; padding:1px 5px; margin-left:6px}
+  .coin .price{flex:1; text-align:right; font-variant-numeric:tabular-nums}
+  .coin .chg{width:76px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
+  .prow{display:flex; justify-content:space-between; gap:10px; padding:9px 0;
+    border-bottom:1px solid var(--border)}
+  .prow:last-child{border-bottom:0}
+  .prow .l .sym{font-weight:700}
+  .prow .l .sub, .prow .r .sub{font-size:12px; color:var(--muted)}
+  .prow .r{text-align:right; font-variant-numeric:tabular-nums}
+  .prow .r .pnl{font-weight:700}
+  #chart{width:100%; height:180px; display:block}
+  .sig{list-style:none; margin:0; padding:0}
+  .sig li{padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px}
+  .sig li:last-child{border-bottom:0}
+  .sig .st{color:var(--muted); font-size:12px; margin-right:8px; white-space:nowrap}
+  .rules{list-style:none; margin:0; padding:0; font-size:13.5px}
+  .rules li{padding:5px 0 5px 18px; position:relative}
+  .rules li:before{content:"•"; position:absolute; left:2px; color:var(--accent)}
+  .foot{color:var(--muted); font-size:12px; text-align:center; margin-top:4px}
+  .empty{color:var(--muted); font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot connecting" id="statusDot"></span>
+    <h1>Крипто-бот · бумажный счёт</h1>
+    <span class="badge" id="testBadge" hidden>ТЕСТ · пороги 0,50%</span>
+    <span class="status" id="statusText">подключение…</span>
+  </header>
+
+  <section class="card">
+    <h2>Баланс бумажного счёта</h2>
+    <div class="equity" id="eqVal">—</div>
+    <div class="growth" id="eqGrowth">депозит $200</div>
+    <div class="grid">
+      <div class="cell"><div class="k">Свободно</div><div class="v" id="cashVal">—</div></div>
+      <div class="cell"><div class="k">В позициях</div><div class="v" id="posVal">—</div>
+        <div class="s" id="posSub"></div></div>
+      <div class="cell"><div class="k">Сделок закрыто</div><div class="v" id="tradesVal">—</div>
+        <div class="s" id="winsVal"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Открытые позиции</h2>
+    <div id="posList"><div class="empty">Загружаю…</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Цены · Kraken, вживую</h2>
+    <div id="coinList"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="chartTitle">График · SOL/USD, 1 мин</h2>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <section class="card">
+    <h2>Последние сигналы</h2>
+    <ul class="sig" id="sigList"><li class="empty">Загружаю…</li></ul>
+  </section>
+
+  <section class="card">
+    <h2>Правила стратегии</h2>
+    <ul class="rules" id="rulesList"></ul>
+  </section>
+
+  <div class="foot" id="updatedAt">Данные счёта: —</div>
+  <div class="foot">Только бумажная торговля. Без реальных денег и ключей.</div>
+</div>
+
+<script>
+"use strict";
+try { var tg = window.Telegram && window.Telegram.WebApp; if (tg) { tg.ready(); tg.expand(); } } catch (e) {}
+
+var PAIRS = {BTC:"BTC/USD", SOL:"SOL/USD", XRP:"XRP/USD", LINK:"LINK/USD",
+             NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD"};
+var REST_PAIR = {BTC:"XBTUSD", SOL:"SOLUSD", XRP:"XRPUSD", LINK:"LINKUSD",
+                 NEAR:"NEARUSD", ADA:"ADAUSD", HMSTR:"HMSTRUSD"};
+var ORDER = ["BTC","SOL","XRP","LINK","NEAR","ADA","HMSTR"];
+var SYM_BY_PAIR = {}; ORDER.forEach(function(s){ SYM_BY_PAIR[PAIRS[s]] = s; });
+
+var live = {};        // sym -> {last, chg}
+var candles = {};     // sym -> [{t,o,h,l,c}]
+var selected = "SOL";
+var currentOhlc = null;
+var account = null;
+
+function $(id){ return document.getElementById(id); }
+function fmtPrice(p){
+  if (p == null || isNaN(p)) return "—";
+  var d = p >= 100 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 5 : 7;
+  return Number(p).toLocaleString("ru-RU", {maximumFractionDigits: d});
+}
+function fmtUSD(v){
+  if (v == null || isNaN(v)) return "—";
+  return (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString("ru-RU",
+    {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function fmtPct(v){
+  if (v == null || isNaN(v)) return "—";
+  return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+}
+function cls(v){ return v >= 0 ? "pos" : "neg"; }
+function priceFor(sym){
+  if (live[sym] && live[sym].last != null) return live[sym].last;
+  if (account && account.prices && account.prices[sym] != null) return account.prices[sym];
+  return null;
+}
+
+/* ---------- список монет ---------- */
+var coinEls = {};
+(function buildCoins(){
+  var box = $("coinList");
+  ORDER.forEach(function(sym){
+    var b = document.createElement("button");
+    b.className = "coin" + (sym === selected ? " active" : "");
+    var name = document.createElement("span"); name.className = "sym"; name.textContent = sym;
+    b.appendChild(name);
+    if (sym === "BTC") {
+      var tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "индикатор";
+      b.appendChild(tag);
+    }
+    var pr = document.createElement("span"); pr.className = "price"; pr.textContent = "—";
+    var ch = document.createElement("span"); ch.className = "chg"; ch.textContent = "";
+    b.appendChild(pr); b.appendChild(ch);
+    b.addEventListener("click", function(){ selectCoin(sym); });
+    box.appendChild(b);
+    coinEls[sym] = {row: b, price: pr, chg: ch};
+  });
+})();
+
+function renderPrices(){
+  ORDER.forEach(function(sym){
+    var d = live[sym], el = coinEls[sym];
+    var p = (d && d.last != null) ? d.last
+          : (account && account.prices ? account.prices[sym] : null);
+    el.price.textContent = p != null ? fmtPrice(p) : "—";
+    if (d && d.chg != null) { el.chg.textContent = fmtPct(d.chg); el.chg.className = "chg " + cls(d.chg); }
+  });
+}
+
+function selectCoin(sym){
+  selected = sym;
+  ORDER.forEach(function(s){ coinEls[s].row.classList.toggle("active", s === sym); });
+  $("chartTitle").textContent = "График · " + PAIRS[sym] + ", 1 мин";
+  loadChartREST(sym);
+  subscribeOhlc(sym);
+  drawChart();
+}
+
+/* ---------- WebSocket Kraken v2 ---------- */
+var ws = null, reconnectDelay = 1000;
+function setStatus(mode, text){
+  var dot = $("statusDot");
+  dot.className = "dot " + mode;
+  $("statusText").textContent = text;
+}
+function connectWS(){
+  setStatus("connecting", "подключение…");
+  try { ws = new WebSocket("wss://ws.kraken.com/v2"); }
+  catch (e) { scheduleReconnect(); return; }
+  ws.onopen = function(){
+    reconnectDelay = 1000;
+    setStatus("live", "LIVE");
+    ws.send(JSON.stringify({method: "subscribe",
+      params: {channel: "ticker", symbol: ORDER.map(function(s){ return PAIRS[s]; })}}));
+    currentOhlc = null;
+    subscribeOhlc(selected);
+  };
+  ws.onmessage = function(ev){
+    var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+    if (msg.channel === "ticker" && msg.data) {
+      msg.data.forEach(function(d){
+        var sym = SYM_BY_PAIR[d.symbol]; if (!sym) return;
+        live[sym] = {last: d.last, chg: d.change_pct};
+      });
+      renderPrices(); renderAccount();
+    } else if (msg.channel === "ohlc" && msg.data) {
+      msg.data.forEach(function(d){
+        var sym = SYM_BY_PAIR[d.symbol]; if (!sym) return;
+        var ts = Date.parse(d.interval_begin || d.timestamp || "") / 1000;
+        if (!ts) return;
+        var c = {t: ts, o: +d.open, h: +d.high, l: +d.low, c: +d.close};
+        var arr = candles[sym] || (candles[sym] = []);
+        if (arr.length && arr[arr.length - 1].t === c.t) arr[arr.length - 1] = c;
+        else if (!arr.length || arr[arr.length - 1].t < c.t) arr.push(c);
+        if (arr.length > 90) arr.splice(0, arr.length - 90);
+        if (sym === selected) drawChart();
+      });
+    }
+  };
+  ws.onclose = function(){ setStatus("off", "нет связи"); scheduleReconnect(); };
+  ws.onerror = function(){ try { ws.close(); } catch (e) {} };
+}
+function scheduleReconnect(){
+  setTimeout(connectWS, reconnectDelay);
+  reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+}
+function subscribeOhlc(sym){
+  if (!ws || ws.readyState !== 1) return;
+  if (currentOhlc && currentOhlc !== sym) {
+    ws.send(JSON.stringify({method: "unsubscribe",
+      params: {channel: "ohlc", symbol: [PAIRS[currentOhlc]], interval: 1}}));
+  }
+  currentOhlc = sym;
+  ws.send(JSON.stringify({method: "subscribe",
+    params: {channel: "ohlc", symbol: [PAIRS[sym]], interval: 1}}));
+}
+
+/* ---------- график ---------- */
+function loadChartREST(sym){
+  fetch("https://api.kraken.com/0/public/OHLC?pair=" + REST_PAIR[sym] + "&interval=1")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || (j.error && j.error.length)) return;
+      var key = Object.keys(j.result).filter(function(k){ return k !== "last"; })[0];
+      if (!key) return;
+      candles[sym] = j.result[key].slice(-60).map(function(c){
+        return {t: +c[0], o: +c[1], h: +c[2], l: +c[3], c: +c[4]};
+      });
+      if (sym === selected) drawChart();
+    })
+    .catch(function(){ /* REST недоступен: график соберётся из WS-потока */ });
+}
+function drawChart(){
+  var cv = $("chart"), ctx = cv.getContext("2d");
+  var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  var arr = (candles[selected] || []).slice(-60);
+  ctx.font = "12px sans-serif"; ctx.fillStyle = "#8b98a8";
+  if (arr.length < 2) { ctx.fillText("Собираю данные графика…", 8, 24); return; }
+  var min = Infinity, max = -Infinity;
+  arr.forEach(function(c){ min = Math.min(min, c.l); max = Math.max(max, c.h); });
+  var pad = (max - min) * 0.08 || max * 0.001 || 1; min -= pad; max += pad;
+  var Y = function(p){ return h - (p - min) / (max - min) * h; };
+  ctx.strokeStyle = "#232c38"; ctx.fillStyle = "#8b98a8"; ctx.lineWidth = 1;
+  for (var i = 1; i <= 3; i++) {
+    var y = h * i / 4, price = max - (max - min) * i / 4;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.fillText(fmtPrice(price), 4, y - 3);
+  }
+  var step = w / arr.length, bw = Math.max(1, Math.floor(step * 0.62));
+  arr.forEach(function(c, i){
+    var x = i * step + step / 2, up = c.c >= c.o;
+    ctx.strokeStyle = ctx.fillStyle = up ? "#2ecc71" : "#ff5c5c";
+    ctx.beginPath(); ctx.moveTo(x, Y(c.h)); ctx.lineTo(x, Y(c.l)); ctx.stroke();
+    var yO = Y(c.o), yC = Y(c.c);
+    ctx.fillRect(x - bw / 2, Math.min(yO, yC), bw, Math.max(1, Math.abs(yC - yO)));
+  });
+}
+window.addEventListener("resize", drawChart);
+
+/* ---------- бумажный счёт ---------- */
+function loadAccount(){
+  fetch("./dashboard.json", {cache: "no-store"})
+    .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(j){
+      account = j;
+      renderAccount(); renderSignals(); renderRules(); renderPrices();
+    })
+    .catch(function(){ /* нет файла рядом: оставим прежние данные */ });
+}
+function renderAccount(){
+  if (!account) return;
+  var cash = account.cash != null ? account.cash : 0;
+  var invested = 0, posVal = 0;
+  (account.open_positions || []).forEach(function(p){
+    invested += p.amount_usd || 0;
+    var cur = priceFor(p.symbol);
+    posVal += cur != null && p.entry_price ? p.amount_usd * cur / p.entry_price
+                                            : (p.amount_usd || 0);
+  });
+  var equity = cash + posVal, dep = account.deposit_usd || 200;
+  var growth = dep ? (equity / dep - 1) * 100 : 0;
+  $("eqVal").textContent = fmtUSD(equity);
+  var g = $("eqGrowth");
+  g.textContent = fmtPct(growth) + " от депозита " + fmtUSD(dep);
+  g.className = "growth " + cls(growth);
+  $("cashVal").textContent = fmtUSD(cash);
+  $("posVal").textContent = fmtUSD(posVal);
+  $("posSub").textContent = "вложено " + fmtUSD(invested);
+  $("tradesVal").textContent = account.trades != null ? account.trades : "—";
+  $("winsVal").textContent = account.wins != null ? "в плюсе: " + account.wins : "";
+  $("updatedAt").textContent = "Данные счёта: " +
+    (account.updated_at_human || account.updated_at || "—");
+  if (account.test_mode) $("testBadge").hidden = false;
+
+  var box = $("posList"); box.textContent = "";
+  var poss = account.open_positions || [];
+  if (!poss.length) {
+    var e = document.createElement("div"); e.className = "empty";
+    e.textContent = "Открытых позиций нет"; box.appendChild(e); return;
+  }
+  poss.forEach(function(p){
+    var cur = priceFor(p.symbol);
+    var pnlPct = (cur != null && p.entry_price) ? (cur / p.entry_price - 1) * 100 : null;
+    var pnlUsd = pnlPct != null ? p.amount_usd * pnlPct / 100 : null;
+    var row = document.createElement("div"); row.className = "prow";
+    var l = document.createElement("div"); l.className = "l";
+    var s1 = document.createElement("div"); s1.className = "sym";
+    s1.textContent = p.symbol + " · " + fmtUSD(p.amount_usd);
+    var s2 = document.createElement("div"); s2.className = "sub";
+    s2.textContent = "вход " + fmtPrice(p.entry_price) +
+      (p.opened_at ? " · " + p.opened_at : "");
+    l.appendChild(s1); l.appendChild(s2);
+    var r = document.createElement("div"); r.className = "r";
+    var v1 = document.createElement("div"); v1.className = "pnl " + (pnlPct != null ? cls(pnlPct) : "");
+    v1.textContent = pnlPct != null ? fmtPct(pnlPct) + " · " + fmtUSD(pnlUsd) : "—";
+    var v2 = document.createElement("div"); v2.className = "sub";
+    v2.textContent = "сейчас " + fmtPrice(cur);
+    r.appendChild(v1); r.appendChild(v2);
+    row.appendChild(l); row.appendChild(r); box.appendChild(row);
+  });
+}
+function renderSignals(){
+  if (!account) return;
+  var box = $("sigList"); box.textContent = "";
+  var sigs = account.signals || [];
+  if (!sigs.length) {
+    var li = document.createElement("li"); li.className = "empty";
+    li.textContent = "Сигналов пока нет"; box.appendChild(li); return;
+  }
+  sigs.forEach(function(s){
+    var li = document.createElement("li");
+    var st = document.createElement("span"); st.className = "st"; st.textContent = s.ts || "";
+    li.appendChild(st);
+    li.appendChild(document.createTextNode(s.text || ""));
+    box.appendChild(li);
+  });
+}
+function renderRules(){
+  if (!account) return;
+  var th = account.thresholds || {}, coins = th.coins || {}, rep = coins.SOL || {};
+  var box = $("rulesList"); box.textContent = "";
+  var items = [
+    "Падение (DIP) → бумажная покупка " + fmtUSD(account.position_usd || 10),
+    "Резкий рост (PUMP) выше цены входа → бумажная продажа",
+    "Выходы: +" + (th.take_profit_pct != null ? th.take_profit_pct : 3) + "% тейк-профит · " +
+      (th.stop_loss_pct != null ? th.stop_loss_pct : -2.5) + "% стоп-лосс · " +
+      ((th.max_hold_minutes || 240) / 60) + " ч таймаут",
+    "BTC-фильтр: при падении BTC ≤ " + (th.btc_filter_pct != null ? th.btc_filter_pct : -1.5) +
+      "% за 5 мин покупки отсекаются",
+    "Пороги: ±" + rep["5m"] + "% / 5 мин · ±" + rep["15m"] + "% / 15 мин · ±" + rep["60m"] + "% / час" +
+      (account.test_mode ? " (тестовый режим)" : "")
+  ];
+  items.forEach(function(t){
+    var li = document.createElement("li"); li.textContent = t; box.appendChild(li);
+  });
+}
+
+/* ---------- старт ---------- */
+loadAccount();
+setInterval(loadAccount, 30000);
+loadChartREST(selected);
+connectWS();
+</script>
+</body>
+</html>
