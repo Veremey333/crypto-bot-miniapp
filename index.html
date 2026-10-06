@@ -581,7 +581,13 @@ function renderSignals(){
   });
 }
 var REASON_LABEL = {SIGNAL_SELL: "по сигналу роста", TAKE_PROFIT: "тейк-профит",
-                    STOP_LOSS: "стоп-лосс", TIMEOUT: "таймаут"};
+                    STOP_LOSS: "стоп-лосс", TIMEOUT: "таймаут",
+                    MOMENTUM_TRAIL: "рост: трейлинг-стоп",
+                    MOMENTUM_STOP: "рост: стоп",
+                    MOMENTUM_TIMEOUT: "рост: таймаут",
+                    LISTING_TAKE_PROFIT: "листинг: тейк-профит",
+                    LISTING_STOP_LOSS: "листинг: стоп-лосс",
+                    LISTING_TIMEOUT: "листинг: таймаут"};
 function renderTrades(){
   if (!account) return;
   var box = $("tradesList"); box.textContent = "";
