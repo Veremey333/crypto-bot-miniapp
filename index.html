@@ -124,6 +124,11 @@
   </section>
 
   <section class="card">
+    <h2>Стратегии</h2>
+    <div id="stratList"><div class="empty">Загружаю…</div></div>
+  </section>
+
+  <section class="card">
     <h2>Баланс во времени</h2>
     <canvas id="eqChart"></canvas>
     <div class="eqinfo" id="eqInfo"></div>
@@ -502,7 +507,7 @@ function loadAccount(){
       rebuildCoins();
       syncTickerSubs();
       renderAccount(); renderSignals(); renderRules();
-      renderTrades(); renderEquity(); renderAllCoins();
+      renderTrades(); renderEquity(); renderAllCoins(); renderStrategies();
     })
     .catch(function(){ /* нет файла рядом: оставим прежние данные */ });
 }
@@ -562,6 +567,31 @@ function renderAccount(){
     v2.textContent = "сейчас " + fmtPrice(cur);
     r.appendChild(v1); r.appendChild(v2);
     row.appendChild(l); row.appendChild(r); box.appendChild(row);
+  });
+}
+function renderStrategies(){
+  if (!account) return;
+  var box = $("stratList"); box.textContent = "";
+  var st = account.strategy_stats || {};
+  var rows = [["DIP", "Просадки (DIP)"], ["MOMENTUM", "Рост (MOMENTUM)"],
+              ["LISTING", "Листинги"]];
+  rows.forEach(function(r){
+    var s = st[r[0]] || {trades: 0, wins: 0, pnl_usd: 0};
+    var pnl = s.pnl_usd != null ? s.pnl_usd : 0;
+    var row = document.createElement("div"); row.className = "prow";
+    var l = document.createElement("div"); l.className = "l";
+    var s1 = document.createElement("div"); s1.className = "sym";
+    s1.textContent = r[1];
+    var s2 = document.createElement("div"); s2.className = "sub";
+    s2.textContent = "сделок " + (s.trades || 0) + " · в плюсе " + (s.wins || 0);
+    l.appendChild(s1); l.appendChild(s2);
+    var rr = document.createElement("div"); rr.className = "r";
+    var v1 = document.createElement("div"); v1.className = "pnl " + cls(pnl);
+    v1.textContent = (pnl >= 0 ? "+$" : "−$") +
+      Math.abs(pnl).toLocaleString("ru-RU", {minimumFractionDigits: 2,
+                                             maximumFractionDigits: 2});
+    rr.appendChild(v1);
+    row.appendChild(l); row.appendChild(rr); box.appendChild(row);
   });
 }
 function renderSignals(){
