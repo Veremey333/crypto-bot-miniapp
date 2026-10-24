@@ -1,37 +1,29 @@
 {
- "updated_at": "2026-10-24T08:21:14.843093-06:00",
- "updated_at_human": "24.10.2026 08:21 (Эдмонтон)",
+ "updated_at": "2026-10-24T09:06:51.552748-06:00",
+ "updated_at_human": "24.10.2026 09:06 (Эдмонтон)",
  "deposit_usd": 200,
  "position_usd": 10,
- "cash": 178.3283406955639,
- "trades": 36,
- "wins": 21,
+ "cash": 188.56391761864083,
+ "trades": 37,
+ "wins": 22,
  "open_positions": [
-  {
-   "symbol": "SFI",
-   "entry_price": 104.0,
-   "amount_usd": 10.0,
-   "ts_open": 1792767980.6654975,
-   "opened_at": "23.10 09:06",
-   "last_price": null
-  },
   {
    "symbol": "NEAR",
    "entry_price": 4.2972,
    "amount_usd": 10.0,
    "ts_open": 1792851419.5638816,
    "opened_at": "24.10 08:16",
-   "last_price": 4.3302
+   "last_price": 4.3565
   }
  ],
  "prices": {
-  "ADA": 0.205284,
+  "ADA": 0.203434,
   "HMSTR": 0.0001426,
-  "LINK": 11.46522,
-  "NEAR": 4.3302,
-  "SOL": 100.41,
-  "XRP": 1.27346,
-  "BTC": 80199.0
+  "LINK": 11.38296,
+  "NEAR": 4.3565,
+  "SOL": 99.82,
+  "XRP": 1.26534,
+  "BTC": 79835.1
  },
  "thresholds": {
   "coins": {
@@ -1520,6 +1512,11 @@
    "ts": "2026-10-24T08:21:14-06:00",
    "ts_ms": 1792851674804,
    "equity": 198.41
+  },
+  {
+   "ts": "2026-10-24T09:06:51-06:00",
+   "ts_ms": 1792854411471,
+   "equity": 198.7
   }
  ]
 }
