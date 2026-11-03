@@ -194,12 +194,15 @@ try { var tg = window.Telegram && window.Telegram.WebApp; if (tg) { tg.ready(); 
    wsnameOfSym — wsname из dashboard.json (BTC -> XBT/USD), нужен для
    сопоставления с полным списком пар Kraken во вкладке «Все монеты». */
 var PAIRS = {BTC:"BTC/USD", SOL:"SOL/USD", XRP:"XRP/USD", LINK:"LINK/USD",
-             NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD"};
+             NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD",
+             DOGE:"XDG/USD", AVAX:"AVAX/USD", DOT:"DOT/USD", ATOM:"ATOM/USD"};
 var REST_PAIR = {BTC:"XBTUSD", SOL:"SOLUSD", XRP:"XRPUSD", LINK:"LINKUSD",
-                 NEAR:"NEARUSD", ADA:"ADAUSD", HMSTR:"HMSTRUSD"};
+                 NEAR:"NEARUSD", ADA:"ADAUSD", HMSTR:"HMSTRUSD",
+                 DOGE:"XDGUSD", AVAX:"AVAXUSD", DOT:"DOTUSD", ATOM:"ATOMUSD"};
 var wsnameOfSym = {BTC:"XBT/USD", SOL:"SOL/USD", XRP:"XRP/USD", LINK:"LINK/USD",
-                   NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD"};
-var ORDER = ["BTC","SOL","XRP","LINK","NEAR","ADA","HMSTR"];
+                   NEAR:"NEAR/USD", ADA:"ADA/USD", HMSTR:"HMSTR/USD",
+                   DOGE:"XDG/USD", AVAX:"AVAX/USD", DOT:"DOT/USD", ATOM:"ATOM/USD"};
+var ORDER = ["BTC","SOL","XRP","LINK","NEAR","ADA","HMSTR","DOGE","AVAX","DOT","ATOM"];
 var SYM_BY_PAIR = {}; ORDER.forEach(function(s){ SYM_BY_PAIR[PAIRS[s]] = s; });
 var tradingCoins = ["SOL","XRP","LINK","NEAR","ADA","HMSTR"]; // уточняется из dashboard.json
 
@@ -612,6 +615,7 @@ function renderSignals(){
 }
 var REASON_LABEL = {SIGNAL_SELL: "по сигналу роста", TAKE_PROFIT: "тейк-профит",
                     STOP_LOSS: "стоп-лосс", TIMEOUT: "таймаут",
+                    MOMENTUM_TP: "рост: тейк-профит",
                     MOMENTUM_TRAIL: "рост: трейлинг-стоп",
                     MOMENTUM_STOP: "рост: стоп",
                     MOMENTUM_TIMEOUT: "рост: таймаут",
@@ -678,17 +682,38 @@ function renderRules(){
   if (!account) return;
   var th = account.thresholds || {}, coins = th.coins || {}, rep = coins.SOL || {};
   var box = $("rulesList"); box.textContent = "";
-  var items = [
-    "Падение (DIP) → бумажная покупка " + fmtUSD(account.position_usd || 10),
-    "Резкий рост (PUMP) выше цены входа → бумажная продажа",
-    "Выходы: +" + (th.take_profit_pct != null ? th.take_profit_pct : 3) + "% тейк-профит · " +
+  var se = th.strategies_enabled || {};
+  var dipOn = se.dip !== false, momOn = se.momentum !== false, listOn = se.listing !== false;
+  var items = [];
+  if (momOn) {
+    items.push("Рост (MOMENTUM) → бумажная покупка " + fmtUSD(account.position_usd || 10) +
+      ": памп +" + (th.momentum_entry_pct != null ? th.momentum_entry_pct : 1.8) +
+      "% за 5 мин при всплеске объёма ×" +
+      (th.momentum_min_volume_ratio != null ? th.momentum_min_volume_ratio : 1.2));
+    items.push("Выходы: +" + (th.momentum_take_profit_pct != null ? th.momentum_take_profit_pct : 4) +
+      "% тейк-профит · трейлинг (активация +1,5%, откат −1% от пика) · стоп −1% · таймаут 60 мин");
+  }
+  if (dipOn) {
+    items.push("Падение (DIP) → бумажная покупка " + fmtUSD(account.position_usd || 10));
+    items.push("Резкий рост (PUMP) выше цены входа → бумажная продажа");
+    items.push("Выходы: +" + (th.take_profit_pct != null ? th.take_profit_pct : 3) + "% тейк-профит · " +
       (th.stop_loss_pct != null ? th.stop_loss_pct : -2.5) + "% стоп-лосс · " +
-      ((th.max_hold_minutes || 240) / 60) + " ч таймаут",
-    "BTC-фильтр: при падении BTC ≤ " + (th.btc_filter_pct != null ? th.btc_filter_pct : -1.5) +
-      "% за 5 мин покупки отсекаются",
-    "Пороги: ±" + rep["5m"] + "% / 5 мин · ±" + rep["15m"] + "% / 15 мин · ±" + rep["60m"] + "% / час" +
-      (account.test_mode ? " (тестовый режим)" : "")
-  ];
+      ((th.max_hold_minutes || 240) / 60) + " ч таймаут");
+  }
+  if (listOn) {
+    items.push("Новые листинги Kraken → алерт и покупка " + fmtUSD(account.position_usd || 10) +
+      " (выходы +25% / −20% / 24 ч)");
+  }
+  if (!dipOn && !listOn) {
+    items.push("Просадки (DIP) и листинги отключены с 02.11.2026 — работает только рост");
+  }
+  items.push("BTC-фильтр: при падении BTC ≤ " + (th.btc_filter_pct != null ? th.btc_filter_pct : -1.5) +
+    "% за 5 мин покупки отсекаются");
+  if (account.trading_coins && account.trading_coins.length) {
+    items.push("Торгуемые монеты: " + account.trading_coins.join(", "));
+  }
+  items.push("Пороги сигналов: ±" + rep["5m"] + "% / 5 мин · ±" + rep["15m"] + "% / 15 мин · ±" + rep["60m"] + "% / час" +
+    (account.test_mode ? " (тестовый режим)" : ""));
   items.forEach(function(t){
     var li = document.createElement("li"); li.textContent = t; box.appendChild(li);
   });

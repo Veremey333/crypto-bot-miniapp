@@ -1,6 +1,6 @@
 {
- "updated_at": "2026-11-02T07:19:44.817554-06:00",
- "updated_at_human": "02.11.2026 07:19 (Эдмонтон)",
+ "updated_at": "2026-11-02T20:05:01.065410-06:00",
+ "updated_at_human": "02.11.2026 20:05 (Эдмонтон)",
  "deposit_usd": 200,
  "position_usd": 10,
  "cash": 197.92738514438798,
@@ -8,17 +8,41 @@
  "wins": 23,
  "open_positions": [],
  "prices": {
-  "ADA": 0.190168,
-  "HMSTR": 0.0001363,
-  "LINK": 11.26606,
-  "NEAR": 4.0588,
-  "SOL": 93.62,
-  "XRP": 1.24519,
-  "BTC": 77506.5
+  "ADA": 0.188941,
+  "ATOM": 1.4206,
+  "AVAX": 8.349,
+  "DOGE": 0.0741065,
+  "DOT": 0.9372,
+  "HMSTR": 0.000135,
+  "LINK": 11.07863,
+  "NEAR": 3.8285,
+  "SOL": 92.19,
+  "XRP": 1.24859,
+  "BTC": 76967.6
  },
  "thresholds": {
   "coins": {
    "ADA": {
+    "5m": 2.5,
+    "15m": 3.5,
+    "60m": 2.0
+   },
+   "ATOM": {
+    "5m": 2.5,
+    "15m": 3.5,
+    "60m": 2.0
+   },
+   "AVAX": {
+    "5m": 2.5,
+    "15m": 3.5,
+    "60m": 2.0
+   },
+   "DOGE": {
+    "5m": 2.5,
+    "15m": 3.5,
+    "60m": 2.0
+   },
+   "DOT": {
     "5m": 2.5,
     "15m": 3.5,
     "60m": 2.0
@@ -54,11 +78,23 @@
   "stop_loss_pct": -2.5,
   "max_hold_minutes": 240,
   "cooldown_minutes": 30,
-  "cooldown_drift_minutes": 120
+  "cooldown_drift_minutes": 120,
+  "strategies_enabled": {
+   "dip": false,
+   "momentum": true,
+   "listing": false
+  },
+  "momentum_entry_pct": 1.8,
+  "momentum_take_profit_pct": 4.0,
+  "momentum_min_volume_ratio": 1.2
  },
  "test_mode": false,
  "trading_coins": [
   "ADA",
+  "ATOM",
+  "AVAX",
+  "DOGE",
+  "DOT",
   "HMSTR",
   "LINK",
   "NEAR",
@@ -67,6 +103,10 @@
  ],
  "pairs": {
   "ADA": "ADA/USD",
+  "ATOM": "ATOM/USD",
+  "AVAX": "AVAX/USD",
+  "DOGE": "XDG/USD",
+  "DOT": "DOT/USD",
   "HMSTR": "HMSTR/USD",
   "LINK": "LINK/USD",
   "NEAR": "NEAR/USD",
@@ -1852,6 +1892,26 @@
   {
    "ts": "2026-11-02T07:19:44-06:00",
    "ts_ms": 1793625584719,
+   "equity": 197.93
+  },
+  {
+   "ts": "2026-11-02T10:10:45-06:00",
+   "ts_ms": 1793635845986,
+   "equity": 197.93
+  },
+  {
+   "ts": "2026-11-02T10:28:53-06:00",
+   "ts_ms": 1793636933756,
+   "equity": 197.93
+  },
+  {
+   "ts": "2026-11-02T11:48:01-06:00",
+   "ts_ms": 1793641681527,
+   "equity": 197.93
+  },
+  {
+   "ts": "2026-11-02T20:05:01-06:00",
+   "ts_ms": 1793671501002,
    "equity": 197.93
   }
  ]
